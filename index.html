@@ -226,6 +226,29 @@ body.chanting #toast{bottom:calc(230px + env(safe-area-inset-bottom,0px))}
 #log li.k-kinh{border-left-color:#e0b860}
 #log li.k-boi{border-left-color:#c0708a}
 
+/* Trò chuyện */
+#chatToggle{position:fixed;z-index:5;left:max(16px, env(safe-area-inset-left,0px));bottom:calc(34px + env(safe-area-inset-bottom,0px));display:inline-flex;align-items:center;gap:7px}
+.chat-badge{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--lacquer-hi);color:#fff;font-size:11px;font-weight:600;display:inline-grid;place-items:center}
+#chatBox{position:fixed;z-index:6;left:max(16px, env(safe-area-inset-left,0px));bottom:calc(76px + env(safe-area-inset-bottom,0px));
+  width:min(340px, calc(100vw - 32px));height:min(440px, calc(100vh - 230px));display:flex;flex-direction:column;gap:8px;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;backdrop-filter:blur(6px)}
+.chat-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.chat-x{border:0;background:none;font-size:22px;line-height:1;color:var(--muted);padding:0 6px}
+.chat-x:hover{color:var(--paper)}
+#chatList{list-style:none;margin:0;padding:0 2px 0 0;flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px;overscroll-behavior:contain}
+#chatList::-webkit-scrollbar{width:6px}#chatList::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+#chatList li{max-width:86%;align-self:flex-start;background:rgba(255,240,210,.06);border:1px solid var(--line);border-radius:10px;padding:5px 9px;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+#chatList li.mine{align-self:flex-end;background:rgba(127,36,24,.6);border-color:var(--lacquer-hi)}
+#chatList .who{display:block;font-size:11px;font-weight:600;color:var(--bronze);margin-bottom:1px}
+#chatList time{font-weight:400;color:var(--muted);margin-left:6px}
+.chat-note{margin:0;font-size:12px;color:var(--muted)}
+.chat-note:empty{display:none}
+#chatForm{display:flex;gap:6px}
+#chatInput{flex:1;min-width:0;background:#140c09;border:1px solid var(--line);border-radius:8px;color:var(--paper);padding:8px 10px;font:inherit;font-size:14px}
+#chatInput:disabled,#chatSend:disabled{opacity:.5;cursor:default}
+.lbl.bub{white-space:normal;width:max-content;max-width:220px;text-align:center;font-size:12px;line-height:1.35;padding:4px 10px;border-radius:10px;
+  background:rgba(239,226,198,.95);color:var(--paper-ink);border-color:var(--bronze)}
+
 @media (max-width:760px){
   .brand h1{font-size:19px}
   .brand .sub{font-size:12px}
@@ -236,7 +259,11 @@ body.chanting #toast{bottom:calc(230px + env(safe-area-inset-bottom,0px))}
     bottom:calc(58px + env(safe-area-inset-bottom,0px));max-height:56vh}
   #panel.closed{display:none}
   #panelToggle{display:block;position:fixed;z-index:5;right:max(12px, env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px))}
-  #note{right:150px;font-size:10.5px}
+  #note{right:150px;font-size:10.5px;padding-left:128px}
+  #chatToggle{left:max(12px, env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  #chatBox{left:max(10px, env(safe-area-inset-left,0px));right:max(10px, env(safe-area-inset-right,0px));width:auto;
+    bottom:calc(58px + env(safe-area-inset-bottom,0px));height:min(56vh, 420px)}
+  #chatInput{font-size:16px}
   #toast{font-size:15px;bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   #chant{bottom:calc(60px + env(safe-area-inset-bottom,0px))}
   .ch-now{font-size:19px}
@@ -303,6 +330,14 @@ body.chanting #toast{bottom:calc(230px + env(safe-area-inset-bottom,0px))}
   </section>
 </aside>
 <button class="btn primary" id="panelToggle" type="button" aria-controls="panel">Bảng đi lễ</button>
+
+<button class="btn" id="chatToggle" type="button" aria-controls="chatBox" aria-expanded="false">Trò chuyện <span class="chat-badge" id="chatBadge" hidden>0</span></button>
+<section id="chatBox" hidden aria-label="Trò chuyện trong chùa">
+  <div class="chat-head"><h2 class="eyebrow">Trò chuyện trong chùa</h2><button class="chat-x" type="button" id="chatClose" aria-label="Đóng khung trò chuyện">×</button></div>
+  <ol id="chatList" aria-live="polite"></ol>
+  <p class="chat-note" id="chatNote">Đang kết nối…</p>
+  <form id="chatForm" autocomplete="off"><input id="chatInput" maxlength="200" placeholder="Nhắn cho mọi người trong chùa…" aria-label="Nội dung tin nhắn" enterkeyhint="send"><button class="btn primary" type="submit" id="chatSend">Gửi</button></form>
+</section>
 
 <div id="toast" role="status" aria-live="polite"></div>
 <footer id="note">Trang mang tính giải trí và động viên tinh thần. Kết quả thi phụ thuộc vào quá trình ôn tập.</footer>
@@ -1493,9 +1528,11 @@ function updateLabels(){
   });
   avatars.forEach(av => {
     tmpV.copy(av.grp.position); tmpV.y += 2.15 - 0.5*av.k; tmpV.project(camera);
-    if (tmpV.z > 1 || tmpV.z < -1){ av.el.style.display = 'none'; return; }
+    if (tmpV.z > 1 || tmpV.z < -1){ av.el.style.display = 'none'; if (av.bub) av.bub.style.display = 'none'; return; }
     av.el.style.display = '';
-    av.el.style.transform = 'translate(' + ((tmpV.x*.5+.5)*w).toFixed(1) + 'px,' + ((-tmpV.y*.5+.5)*h).toFixed(1) + 'px) translate(-50%,-100%)';
+    const tr = 'translate(' + ((tmpV.x*.5+.5)*w).toFixed(1) + 'px,' + ((-tmpV.y*.5+.5)*h).toFixed(1) + 'px) translate(-50%,-100%)';
+    av.el.style.transform = tr;
+    if (av.bub){ av.bub.style.display = ''; av.bub.style.transform = tr + ' translateY(-28px)'; }
   });
 }
 
@@ -1792,7 +1829,7 @@ function addAvatar(o){
   const av = { grp, el, path: [], at: null, face: Math.PI, kneel: false, wantKneel: false, k: 0, walk: 0, phase: Math.random()*6, off: o.off || V(0,0,0), me: !!o.me, ten: o.ten, gioi: o.gioi, ao: o.ao, act: null };
   avatars.push(av); return av;
 }
-function removeAvatar(av){ scene.remove(av.grp); av.el.remove(); const i = avatars.indexOf(av); if (i >= 0) avatars.splice(i, 1); }
+function removeAvatar(av){ scene.remove(av.grp); av.el.remove(); if (av.bub){ av.bub.remove(); av.bub = null; } const i = avatars.indexOf(av); if (i >= 0) avatars.splice(i, 1); }
 function goTo(av, key){
   if (!TARGETS[key] || (av.at === key && !av.path.length)) return;
   av.path = buildRoute(av.at, key, av.off); av.at = key; av.kneel = false;
@@ -1927,7 +1964,83 @@ function peersFromAll(){
   return Object.keys(lastAll).filter(k => k !== fbTab && typeof lastAll[k] === 'object' && lastAll[k] && now - (Number(lastAll[k].t) || 0) < STALE_MS)
     .map(k => ({ peer: k, kind: 'viewer', isMe: !!fbUid && k.indexOf(fbUid + '_') === 0, sameTab: false, presence: lastAll[k] }));
 }
-function fbFail(reason){ roomState = 'off'; roomReason = reason; renderVisitors(); startSharedWishes(null); }
+/* ---------------- TRÒ CHUYỆN TRONG CHÙA ----------------
+   Tin nhắn lưu ở chua/<phòng>/chat/<id>: { uid, ten, loi, ts }. Mỗi người chỉ gửi hoặc gỡ tin của mình;
+   tin cũ hơn 3 ngày thì ai đang mở trang cũng dọn được. */
+const chat = { ref: null, open: false, unread: 0, items: new Map(), lastSend: 0, state: 'connecting', since: 0 };
+const chatBox = $('#chatBox'), chatList = $('#chatList'), chatToggle = $('#chatToggle'), chatBadge = $('#chatBadge'), chatNote = $('#chatNote'), chatInput = $('#chatInput');
+function chatTime(ts){ const d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+function renderChatNote(msg){
+  chatNote.textContent = msg || (chat.state === 'on' ? (chat.items.size ? '' : 'Chưa có tin nhắn nào. Chào mọi người trong chùa một câu nhé.') : chat.state === 'off' ? 'Chưa kết nối được phòng chung nên chưa trò chuyện được. Xem lý do ở mục Đang ở chùa.' : 'Đang kết nối…');
+  chatInput.disabled = $('#chatSend').disabled = chat.state !== 'on';
+}
+function renderBadge(){ chatBadge.hidden = !chat.unread; chatBadge.textContent = chat.unread > 9 ? '9+' : String(chat.unread); }
+function setChatOpen(v){
+  chat.open = v; chatBox.hidden = !v; chatToggle.setAttribute('aria-expanded', String(v));
+  if (!v) return;
+  chat.unread = 0; renderBadge(); chatList.scrollTop = chatList.scrollHeight;
+  if (isMobile){ if (!panel.classList.contains('closed')){ panel.classList.add('closed'); toggle.textContent = 'Bảng đi lễ'; } }
+  else if (!chatInput.disabled) chatInput.focus();
+}
+function myChatName(){ return (me.profile && cleanName(me.profile.ten)) || ('Khách ' + (100 + hashStr(fbTab || 'x') % 900)); }
+function cleanMsg(id, v){
+  if (!v || typeof v !== 'object') return null;
+  const loi = cleanText(v.loi, 200); if (!loi) return null;
+  return { id, loi, ten: cleanName(v.ten) || 'Khách', ts: Number(v.ts) || 0, uid: typeof v.uid === 'string' ? v.uid : '' };
+}
+function showBubble(m){
+  let av = null;
+  if (m.uid && m.uid === fbUid) av = me.av;
+  else remote.forEach((a, peer) => { if (!av && m.uid && peer.indexOf(m.uid + '_') === 0) av = a; });
+  if (!av) return;
+  if (!av.bub){ av.bub = document.createElement('div'); av.bub.className = 'lbl bub'; labelsEl.appendChild(av.bub); }
+  av.bub.textContent = m.loi.length > 90 ? m.loi.slice(0, 88) + '…' : m.loi;
+  clearTimeout(av.bubT); av.bubT = setTimeout(() => { if (av.bub){ av.bub.remove(); av.bub = null; } }, 8000);
+}
+function addChatItem(m, fresh){
+  if (chat.items.has(m.id)) return;
+  const mine = !!m.uid && m.uid === fbUid;
+  const li = document.createElement('li'); if (mine) li.className = 'mine';
+  const who = document.createElement('span'); who.className = 'who'; who.textContent = mine ? 'Bạn' : m.ten;
+  const t = document.createElement('time'); t.textContent = chatTime(m.ts); who.appendChild(t);
+  li.append(who, document.createTextNode(m.loi));
+  const atBottom = chatList.scrollHeight - chatList.scrollTop - chatList.clientHeight < 40;
+  chatList.appendChild(li); m.li = li; chat.items.set(m.id, m);
+  if (atBottom || mine) chatList.scrollTop = chatList.scrollHeight;
+  if (fresh){
+    showBubble(m);
+    if (!mine){ if (!chat.open){ chat.unread++; renderBadge(); } if (audio.on) sBell(1046, .05, .12); }
+  }
+  renderChatNote();
+}
+function startChat(db){
+  if (!db){ chat.state = 'off'; renderChatNote(); return; }
+  chat.ref = db.ref('chua/' + TEN_PHONG + '/chat'); chat.since = Date.now() + serverOffset - 5000;
+  const q = chat.ref.orderByChild('ts').limitToLast(60);
+  q.on('child_added', snap => { const m = cleanMsg(snap.key, snap.val()); if (m) addChatItem(m, m.ts >= chat.since); }, () => { chat.state = 'off'; renderChatNote(); });
+  q.on('child_removed', snap => { const m = chat.items.get(snap.key); if (m){ m.li.remove(); chat.items.delete(snap.key); renderChatNote(); } });
+  chat.state = 'on'; renderChatNote();
+  // dọn tin nhắn cũ hơn 3 ngày (trừ hao 1 giờ lệch đồng hồ)
+  setTimeout(() => {
+    chat.ref.orderByChild('ts').endAt(Date.now() + serverOffset - 3*86400000 - 3600000).limitToFirst(40).once('value', s => s.forEach(ch => { ch.ref.remove().catch(() => {}); })).catch(() => {});
+  }, 8000);
+}
+chatToggle.onclick = () => setChatOpen(!chat.open);
+$('#chatClose').onclick = () => { setChatOpen(false); chatToggle.focus(); };
+chatInput.addEventListener('keydown', e => { if (e.key === 'Escape'){ e.stopPropagation(); setChatOpen(false); chatToggle.focus(); } });
+$('#chatForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const loi = cleanText(chatInput.value, 200);
+  if (!loi || chat.state !== 'on' || !chat.ref) return;
+  const now = Date.now();
+  if (now - chat.lastSend < 1500){ renderChatNote('Gửi chậm lại một chút nhé.'); return; }
+  chat.lastSend = now; chatInput.value = '';
+  chat.ref.push().set({ uid: fbUid, ten: myChatName(), loi, ts: firebase.database.ServerValue.TIMESTAMP })
+    .then(() => renderChatNote())
+    .catch(() => { chatInput.value = loi; renderChatNote('Chưa gửi được tin nhắn. Kiểm tra mạng rồi thử lại.'); });
+});
+
+function fbFail(reason){ roomState = 'off'; roomReason = reason; renderVisitors(); startSharedWishes(null); startChat(null); }
 function startFirebase(){
   const c = FIREBASE_CONFIG;
   if (!c.apiKey || !c.databaseURL){ fbFail('chuaCauHinh'); return; }
@@ -1950,6 +2063,7 @@ function startFirebase(){
     shared.canWrite = true;
     shared.db = { collection: () => ({ doc: id => ({ set: d => wref.child(id).set(Object.assign({}, d, { uid: fbUid })), delete: () => wref.child(id).remove() }) }) };
     shared.state = 'on'; renderWishNote();
+    startChat(db);
     wref.orderByChild('ts').limitToLast(300).on('value', snap => {
       const m = new Map();
       snap.forEach(ch => { const v = ch.val() || {}; const w = cleanWish(Object.assign({ id: ch.key }, v)); if (w) m.set(w.id, w); });
@@ -1966,7 +2080,7 @@ function startFirebase(){
     setInterval(() => { if (roomState === 'on') syncPeers(peersFromAll()); }, 30000);
   }).catch(e => {
     const code = (e && e.code) || '';
-    startSharedWishes(null);
+    startSharedWishes(null); startChat(null);
     roomState = 'off';
     roomReason = code === 'auth/operation-not-allowed' || code === 'auth/admin-restricted-operation' ? 'anonTat' : code === 'auth/unauthorized-domain' ? 'tenMien' : code === 'auth/network-request-failed' ? 'khongTai' : '';
     renderVisitors();
@@ -2155,7 +2269,7 @@ $('#btnNgay').onclick = () => { $('#dNgay').value = state.ngayThi; showOverlay($
 $('#fDate').addEventListener('submit', e => { e.preventDefault(); const v = $('#dNgay').value; if (parseDate(v)){ state.ngayThi = v; store.set(K.ngay, v); renderTop(); log('Ngày thi đã đặt là ' + fmtDate(v) + '.'); } hideOverlay($('#mDate')); });
 const panel = $('#panel'), toggle = $('#panelToggle');
 if (!isMobile) panel.classList.remove('closed');
-toggle.onclick = () => { const closed = panel.classList.toggle('closed'); toggle.textContent = closed ? 'Bảng đi lễ' : 'Đóng bảng'; };
+toggle.onclick = () => { const closed = panel.classList.toggle('closed'); toggle.textContent = closed ? 'Bảng đi lễ' : 'Đóng bảng'; if (!closed && isMobile && chat.open) setChatOpen(false); };
 function closePanelMobile(){ if (matchMedia('(max-width: 760px)').matches){ panel.classList.add('closed'); toggle.textContent = 'Bảng đi lễ'; } }
 
 /* ---------------- BẤM VÀO VẬT THỂ ---------------- */
