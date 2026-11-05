@@ -2568,7 +2568,7 @@ function showInfo(key, extra){
 // nút hoạt động khác
 (function(){
   const box = $('#moreActs');
-  [['Tụng kinh', openKinh], ['Xem bói', openBoi], ['Gõ trống', () => { flySpot('drum'); goTrong(); closePanelMobile(); }], ['Thăm La Hán', () => { flySpot('lahan'); closePanelMobile(); }]].forEach(([t, fn]) => {
+  [['Trò chuyện', () => { closePanelMobile(); setChatOpen(true); }], ['Tụng kinh', openKinh], ['Xem bói', openBoi], ['Gõ trống', () => { flySpot('drum'); goTrong(); closePanelMobile(); }], ['Thăm La Hán', () => { flySpot('lahan'); closePanelMobile(); }]].forEach(([t, fn]) => {
     const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.onclick = fn; box.appendChild(b);
   });
 })();
