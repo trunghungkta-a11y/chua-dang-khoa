@@ -390,7 +390,11 @@ body.chanting #toast{bottom:calc(230px + env(safe-area-inset-bottom,0px))}
       <div class="field"><label for="bTen">Tên</label><input id="bTen" maxlength="24" autocomplete="off"></div>
       <div class="field"><label for="bNam">Năm sinh âm lịch</label><input id="bNam" type="number" inputmode="numeric" min="1930" max="2020" placeholder="1990"></div>
     </div>
-    <p class="muted">Sinh trước Tết Nguyên đán thì nhập năm trước đó. Ngày thi lấy theo ô đếm ngược.</p>
+    <div class="row2">
+      <div class="field"><label for="bNgay">Ngày thi</label><input id="bNgay" type="date"></div>
+      <div class="field"><label for="bGio">Giờ thi (không bắt buộc)</label><input id="bGio" type="time" step="300"></div>
+    </div>
+    <p class="muted">Sinh trước Tết Nguyên đán thì nhập năm trước đó. Có giờ thi thì quẻ tính luôn giờ nên lên đường.</p>
     <div class="err" id="bErr"></div>
     <div id="bKetQua"></div>
     <div class="actions"><button class="btn" type="button" data-close>Đóng</button><button class="btn primary" type="submit" id="bXem">Xem quẻ</button></div>
@@ -534,7 +538,7 @@ const CONFIG = {
   queDoTruot: [
     { loai: "truot", tyLe: 20, loi: "Bạn trượt chắc, chúc bạn may mắn kỳ sau." },
     { loai: "do",    tyLe: 40, loi: "Bạn sẽ đỗ cả Nghị Quyết và sát hạch, wow bạn quả là tuyệt vời!" },
-    { loai: "mot",   tyLe: 40, loi: "Bạn chỉ đỗ {monDo}. Hãy tập trung vào môn {monTruot}." }
+    { loai: "mot",   tyLe: 40, loi: "Bạn đỗ {monDo}. Hãy tập trung vào môn {monTruot}." }
   ],
 
   // Lời nhắn ở cuối quẻ bói (chọn theo tên và năm sinh)
@@ -2034,27 +2038,38 @@ const NAP_AM = ['Hải Trung Kim','Lư Trung Hỏa','Đại Lâm Mộc','Lộ B�
 const HOANG_DAO = [[0,1,3,6,8,9],[2,3,5,8,10,11],[0,1,4,5,7,10],[0,2,3,6,7,9],[2,4,5,8,9,11],[1,4,6,7,10,11]];
 function jdn(y, m, d){ const a = Math.floor((14 - m)/12), y2 = y + 4800 - a, m2 = m + 12*a - 3; return d + Math.floor((153*m2 + 2)/5) + 365*y2 + Math.floor(y2/4) - Math.floor(y2/100) + Math.floor(y2/400) - 32045; }
 function gioText(i){ const st = (23 + 2*i) % 24; return st + 'h–' + ((st + 2) % 24) + 'h'; }
-function xemBoi(ten, nam){
+function hhmm(m){ return Math.floor(m/60) + ':' + pad(m % 60); }
+function xemBoi(ten, nam, ngayThi, gioThi){
   const mod = (a, b) => ((a % b) + b) % b;
   const nap = NAP_AM[Math.floor(mod(nam - 1984, 60)/2)], hanh = nap.split(' ').pop();
-  const d = parseDate(state.ngayThi), j = jdn(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  const d = parseDate(ngayThi), j = jdn(d.getFullYear(), d.getMonth() + 1, d.getDate());
   const chiNgay = (j + 1) % 12, hoang = HOANG_DAO[chiNgay % 6], sang = hoang.filter(i => i >= 3 && i <= 5);
-  const h = hashStr(ten + '|' + nam + '|' + state.ngayThi);
+  const h = hashStr(ten + '|' + nam + '|' + ngayThi);
+  let gio = null, diSom;
+  const gm = /^(\d{1,2}):(\d{2})/.exec(gioThi || '');
+  if (gm){
+    const thiM = (+gm[1])*60 + (+gm[2]), coMat = Math.max(0, thiM - 30), chiGio = Math.floor(((+gm[1] + 1) % 24)/2);
+    gio = gm[1].padStart(2, '0') + ':' + gm[2] + ', giờ ' + CHI[chiGio] + (hoang.includes(chiGio) ? ', rơi vào giờ hoàng đạo.' : ', không phải giờ hoàng đạo. Đọc đề chậm rãi là được.');
+    // giờ hoàng đạo gần nhất bắt đầu trước lúc phải có mặt (không sớm quá 3 tiếng, không trước 3h sáng)
+    const cand = hoang.map(i => ({ i, st: ((23 + 2*i) % 24)*60 })).filter(x => x.i > 0 && x.st >= 180 && x.st <= coMat && coMat - x.st <= 180).sort((a, b) => b.st - a.st)[0];
+    diSom = (cand ? 'Xuất hành giờ ' + CHI[cand.i] + ' (' + gioText(cand.i) + '), ' : 'Không có giờ hoàng đạo ngay trước giờ thi. ') + 'có mặt lúc ' + hhmm(coMat) + ', trước giờ thi 30 phút.';
+  } else diSom = sang.length ? 'Giờ ' + CHI[sang[0]] + ' (' + gioText(sang[0]) + '), có mặt trước giờ thi 30 phút.' : 'Buổi sáng không có giờ hoàng đạo. Cứ đi sớm, có mặt trước giờ thi 30 phút.';
   return {
     ten,
     tuoi: CAN[mod(nam + 6, 10)] + ' ' + CHI[mod(nam + 8, 12)] + ' (' + nam + ')',
     menh: nap,
-    ngay: fmtDate(state.ngayThi) + ', ngày ' + CAN[(j + 9) % 10] + ' ' + CHI[chiNgay],
+    ngay: fmtDate(ngayThi) + ', ngày ' + CAN[(j + 9) % 10] + ' ' + CHI[chiNgay],
+    gioThi: gio,
     gio: hoang.map(i => CHI[i] + ' (' + gioText(i) + ')').join(', '),
-    diSom: sang.length ? 'Giờ ' + CHI[sang[0]] + ' (' + gioText(sang[0]) + '), có mặt trước giờ thi 30 phút.' : 'Buổi sáng không có giờ hoàng đạo. Cứ đi sớm, có mặt trước giờ thi 30 phút.',
+    diSom,
     mau: (CONFIG.mauTheoMenh || {})[hanh] || '—',
     so: String(h % 9 + 1),
     loi: CONFIG.boiLoiNhan[h % CONFIG.boiLoiNhan.length],
-    phan: phanDoTruot(ten, nam)
+    phan: phanDoTruot(ten, nam, ngayThi)
   };
 }
-function phanDoTruot(ten, nam){
-  const r = hashStr('dotruot|' + ten.toLowerCase() + '|' + nam + '|' + state.ngayThi) % 10000 / 100;  // 0–99.99
+function phanDoTruot(ten, nam, ngayThi){
+  const r = hashStr('dotruot|' + ten.toLowerCase() + '|' + nam + '|' + ngayThi) % 10000 / 100;  // 0–99.99
   const list = CONFIG.queDoTruot; let acc = 0, pickQ = list[list.length - 1];
   for (const q of list){ acc += q.tyLe; if (r < acc){ pickQ = q; break; } }
   let loi = pickQ.loi;
@@ -2074,7 +2089,7 @@ function renderBoi(r){
   const pt = document.createElement('strong'); pt.textContent = r.phan.loi;
   ph.append(pl, pt); d.appendChild(ph);
   const dl = document.createElement('dl');
-  [['Tuổi', r.tuoi], ['Mệnh', r.menh], ['Ngày thi', r.ngay], ['Giờ hoàng đạo', r.gio], ['Lên đường', r.diSom], ['Màu áo hợp', r.mau], ['Số may mắn', r.so]].forEach(([k, v]) => {
+  [['Tuổi', r.tuoi], ['Mệnh', r.menh], ['Ngày thi', r.ngay], ['Giờ thi', r.gioThi], ['Giờ hoàng đạo', r.gio], ['Lên đường', r.diSom], ['Màu áo hợp', r.mau], ['Số may mắn', r.so]].filter(x => x[1]).forEach(([k, v]) => {
     const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd);
   });
   d.appendChild(dl);
@@ -2085,6 +2100,8 @@ function renderBoi(r){
 function openBoi(){
   if (!$('#bTen').value && me.profile) $('#bTen').value = me.profile.ten;
   const y = store.get('chuaDK.namSinh', ''); if (y && !$('#bNam').value) $('#bNam').value = y;
+  if (!$('#bNgay').value) $('#bNgay').value = store.get('chuaDK.boiNgay', '') || state.ngayThi || '';
+  if (!$('#bGio').value) $('#bGio').value = store.get('chuaDK.boiGio', '');
   $('#bErr').textContent = ''; $('#bKetQua').innerHTML = ''; $('#bXem').textContent = 'Xem quẻ';
   setAct('boi'); flySpot('boi'); closePanelMobile(); showOverlay($('#mBoi'));
 }
@@ -2092,9 +2109,11 @@ $('#fBoi').addEventListener('submit', e => {
   e.preventDefault();
   const ten = cleanName($('#bTen').value) || 'Sĩ tử', nam = parseInt($('#bNam').value, 10);
   if (!(nam >= 1930 && nam <= 2020)){ $('#bErr').textContent = 'Nhập năm sinh từ 1930 đến 2020, ví dụ 1990.'; $('#bNam').focus(); return; }
-  if (!parseDate(state.ngayThi)){ $('#bErr').textContent = 'Chưa có ngày thi. Bấm ô đếm ngược trên cùng để đặt ngày thi.'; return; }
-  $('#bErr').textContent = ''; store.set('chuaDK.namSinh', nam);
-  renderBoi(xemBoi(ten, nam)); $('#bXem').textContent = 'Xem lại';
+  const ngay = $('#bNgay').value, gio = $('#bGio').value;
+  if (!parseDate(ngay)){ $('#bErr').textContent = 'Chọn ngày thi của bạn.'; $('#bNgay').focus(); return; }
+  if (gio && !/^\d{1,2}:\d{2}/.test(gio)){ $('#bErr').textContent = 'Giờ thi chưa đúng, ví dụ 08:00.'; $('#bGio').focus(); return; }
+  $('#bErr').textContent = ''; store.set('chuaDK.namSinh', nam); store.set('chuaDK.boiNgay', ngay); store.set('chuaDK.boiGio', gio);
+  renderBoi(xemBoi(ten, nam, ngay, gio)); $('#bXem').textContent = 'Xem lại';
   log('Bạn đã xem bói ở lều xem bói.', 'boi'); nhac();
 });
 
