@@ -246,6 +246,9 @@ body.chanting #toast{bottom:calc(230px + env(safe-area-inset-bottom,0px))}
 #chatForm{display:flex;gap:6px}
 #chatInput{flex:1;min-width:0;background:#140c09;border:1px solid var(--line);border-radius:8px;color:var(--paper);padding:8px 10px;font:inherit;font-size:14px}
 #chatInput:disabled,#chatSend:disabled{opacity:.5;cursor:default}
+#chatList li.bay{border-color:#9ab8ff;background:rgba(80,100,150,.25)}
+.bay-tag{display:block;font-size:11px;color:#b9cdff;margin-top:2px}
+.chat-admin{font-size:12px!important;border:1px solid var(--line)!important;border-radius:6px;padding:2px 8px!important;margin-left:auto}
 .lbl.bub{white-space:normal;width:max-content;max-width:220px;text-align:center;font-size:12px;line-height:1.35;padding:4px 10px;border-radius:10px;
   background:rgba(239,226,198,.95);color:var(--paper-ink);border-color:var(--bronze)}
 
@@ -417,6 +420,18 @@ body.chanting #toast{bottom:calc(230px + env(safe-area-inset-bottom,0px))}
   </div>
 </div>
 
+<!-- Từ cấm trong khung chat (chỉ hiện khi mở trang với ?quantri) -->
+<div class="overlay" id="mTuBay" hidden>
+  <form class="card" id="fTuBay" novalidate>
+    <h2>Từ cấm trong khung chat</h2>
+    <p class="muted">Mỗi dòng một từ hoặc cụm từ. Tin nhắn có các từ này sẽ bị che chữ, và người gõ bị sét đánh trúng đầu. Không phân biệt chữ hoa, chữ thường; phải gõ đúng dấu (thêm cả bản không dấu nếu muốn chặn).</p>
+    <div class="field"><label for="tbList">Danh sách từ cấm</label><textarea id="tbList" rows="12" spellcheck="false"></textarea></div>
+    <p class="muted" id="tbAcc">Chỉ tài khoản Google của chủ chùa lưu được danh sách.</p>
+    <div class="err" id="tbErr"></div>
+    <div class="actions"><button class="btn" type="button" data-close>Đóng</button><button class="btn" type="button" id="tbLogin">Đăng nhập Google</button><button class="btn primary" type="submit" id="tbSave">Lưu danh sách</button></div>
+  </form>
+</div>
+
 <!-- Xem bói -->
 <div class="overlay" id="mBoi" hidden>
   <form class="card" id="fBoi" novalidate>
@@ -566,6 +581,13 @@ const CONFIG = {
       "Đều trọn thành Phật đạo."
     ] }
   ],
+
+  // ===== TỪ CẤM TRONG KHUNG CHAT =====
+  // Ai gõ các từ này sẽ bị che chữ và bị sét đánh. Không phân biệt hoa thường, phải đúng dấu.
+  // Cách 1: sửa thẳng danh sách dưới đây trên GitHub (mở index.html > bút chì > sửa > Commit changes).
+  // Cách 2: mở trang với đuôi ?quantri, bấm "Từ cấm" trong khung chat (cần bật đăng nhập Google trong Firebase).
+  //         Danh sách lưu theo cách 2 sẽ được dùng thay cho danh sách dưới đây.
+  tuBay: ["đm", "dm", "đmm", "dmm", "đcm", "dcm", "đkm", "vcl", "vkl", "vcđ", "vãi lồn", "đéo", "địt", "đụ", "đụ má", "lồn", "cặc", "buồi", "đĩ", "óc chó", "mẹ mày", "clm", "cmm", "fuck", "shit"],
 
   // Quẻ phán đỗ/trượt ở lều xem bói. tyLe là phần trăm; ba mức cộng lại phải bằng 100.
   // Cùng tên, năm sinh và ngày thi thì luôn ra cùng một quẻ.
@@ -1251,6 +1273,74 @@ const booth = new THREE.Group(); booth.position.set(8.5, 0, 21.2);
 scene.add(booth); clickable(booth, 'boi');
 makeLantern(9.65, 2.3, 22.15, 0.7);
 
+/* ===== BA NGỌN NÚI PHÍA SAU ===== */
+function mountain(x, z, r, h, seed){
+  const geo = new THREE.ConeGeometry(r, h, 30, 12, true), pos = geo.attributes.position, cols = [];
+  const low = new THREE.Color('#3b4d34'), mid = new THREE.Color('#55603f'), rock = new THREE.Color('#77705f'), top = new THREE.Color('#a59c8a'), c = new THREE.Color();
+  for (let i=0;i<pos.count;i++){
+    const vx = pos.getX(i), vy = pos.getY(i), vz = pos.getZ(i), a = Math.atan2(vz, vx), k = (vy + h/2)/h;   // k: 0 chân núi, 1 đỉnh
+    const n = 1 + 0.16*Math.sin(a*3 + seed) + 0.1*Math.sin(a*7 + seed*2.3 + k*5) + 0.06*Math.sin(a*13 + seed*4.1 + k*9);
+    pos.setXYZ(i, vx*n, vy + (k < 0.98 ? Math.sin(a*5 + seed)*h*0.025*(1 - k) : 0), vz*n);
+    if (k < 0.45) c.copy(low).lerp(mid, k/0.45); else if (k < 0.8) c.copy(mid).lerp(rock, (k - 0.45)/0.35); else c.copy(rock).lerp(top, (k - 0.8)/0.2);
+    cols.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3)); geo.computeVertexNormals();
+  const m = mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1 }), x, h/2 - 1.5, z);
+  m.rotation.y = seed; m.userData.noShadow = true; scene.add(m); return m;
+}
+mountain(-40, -72, 26, 36, 1.3);
+mountain(2, -86, 34, 52, 2.7);
+mountain(44, -74, 28, 41, 4.2);
+
+/* ===== DÒNG SÔNG TRƯỚC CỔNG, CẦU VÒM ===== */
+const RIVER = { z: 40, w: 8 };
+const riverTex = (function(){
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64; const g = cv.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 64);
+  for (let i=0;i<40;i++){ g.fillStyle = 'rgba(150,190,200,' + (0.15 + Math.random()*0.25) + ')'; g.fillRect(Math.random()*256, Math.random()*64, 20 + Math.random()*60, 1.5 + Math.random()*2); }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(14, 1); return t;
+})();
+const riverMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#2f5f66'), map: riverTex, roughness: .15, metalness: .3, transparent: true, opacity: .9 });
+(function(){
+  const river = mesh(new THREE.PlaneGeometry(260, RIVER.w), riverMat, 0, 0.06, RIVER.z); river.rotation.x = -Math.PI/2; river.userData.noShadow = true; scene.add(river);
+  const bed = mesh(new THREE.PlaneGeometry(260, RIVER.w + 1.6), M('#3a3324', { roughness: 1 }), 0, 0.01, RIVER.z); bed.rotation.x = -Math.PI/2; bed.userData.noShadow = true; scene.add(bed);
+  [-1, 1].forEach(sd => { const bk = box(260, 0.32, 0.7, M('#7d7060', { roughness: 1 }), 0, 0.12, RIVER.z + sd*(RIVER.w/2 + 0.35)); bk.userData.noShadow = true; scene.add(bk); });
+  // đường từ cổng ra cầu
+  const pth = mesh(new THREE.PlaneGeometry(4, RIVER.z - RIVER.w/2 - 27.4), M('#7a6a58', { roughness: .95 }), 0, 0.025, (27.4 + RIVER.z - RIVER.w/2)/2); pth.rotation.x = -Math.PI/2; pth.userData.noShadow = true; scene.add(pth);
+  // cầu vòm gỗ, lan can son đỏ
+  const g = new THREE.Group(); g.position.set(0, 0, RIVER.z);
+  const L = RIVER.w + 3, n = 12, H = 1.5, arcY = t => H*Math.sin(Math.PI*t), deck = M('#7a5a3a', { roughness: .8 }), rail = M(C.cot, { roughness: .55 });
+  for (let i=0;i<n;i++){
+    const t0 = i/n, t1 = (i + 1)/n, z0 = -L/2 + t0*L, z1 = -L/2 + t1*L, y0 = arcY(t0), y1 = arcY(t1);
+    const len = Math.hypot(z1 - z0, y1 - y0), b = box(3.0, 0.22, len + 0.04, deck, 0, (y0 + y1)/2 + 0.1, (z0 + z1)/2);
+    b.rotation.x = -Math.atan2(y1 - y0, z1 - z0); g.add(b);
+    [-1.45, 1.45].forEach(x => {
+      const r = box(0.1, 0.1, len + 0.04, rail, x, (y0 + y1)/2 + 0.95, (z0 + z1)/2); r.rotation.x = b.rotation.x; g.add(r);
+      g.add(box(0.12, 0.85, 0.12, rail, x, y0 + 0.62, z0));
+    });
+  }
+  [-1.45, 1.45].forEach(x => g.add(box(0.12, 0.85, 0.12, rail, x, 0.62, L/2)));
+  scene.add(g);
+})();
+
+/* ===== BA CỤM MÂY TRẮNG (cũng là nơi phát ra sét) ===== */
+const clouds = [], cloudWhite = new THREE.Color(0xffffff), cloudNight = new THREE.Color(0x8e93a8), cloudDark = new THREE.Color(0x4a4c58);
+[{ cx: -9, cz: -6, y: 24, rx: 6, rz: 4, w: .05, ph: 0, s: 1.0 }, { cx: 9, cz: 3, y: 26, rx: 5, rz: 6, w: -.04, ph: 2.1, s: 0.95 }, { cx: 0, cz: 15, y: 23, rx: 7, rz: 3, w: .035, ph: 4.2, s: 0.9 }].forEach((o, ci) => {
+  const g = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x2a2a2a, roughness: 1, flatShading: true });
+  for (let i=0;i<9;i++){
+    const a = i/9*Math.PI*2, r = (i % 3 === 0 ? 0.6 : 1.8 + (i % 2)*0.8)*o.s;
+    const puff = mesh(new THREE.IcosahedronGeometry((1.7 + ((i*7 + ci) % 5)*0.3)*o.s, 1), mat, Math.cos(a)*r*1.5, (i % 3 === 0 ? 0.9 : 0.1)*o.s, Math.sin(a)*r*0.8);
+    puff.scale.y = 0.72; g.add(puff);
+  }
+  g.add(mesh(new THREE.IcosahedronGeometry(2.4*o.s, 1), mat, 0, 0.8*o.s, 0));
+  g.traverse(m => { if (m.isMesh){ m.castShadow = !isMobile; m.userData.noShadow = true; } });
+  Object.assign(g.userData, o, { mat, strike: null });
+  g.position.set(o.cx + Math.cos(o.ph)*o.rx, o.y, o.cz + Math.sin(o.ph)*o.rz);
+  scene.add(g); clouds.push(g);
+});
+const strikeLight = new THREE.PointLight(0xcfe0ff, 0, 40, 2); strikeLight.position.set(0, 4, 0); scene.add(strikeLight);
+let flashAmt = 0;
+
 /* ===== NGƯỜI: KHÁCH THAM QUAN & SƯ TRỤ TRÌ ===== */
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const SKIN = M('#e0b089', { roughness: .7 });
@@ -1500,7 +1590,7 @@ function rebuildWishObjects(flyId){
 
 /* ---------------- NHÃN CÔNG TRÌNH & ĐIỂM BAY TỚI ---------------- */
 const SPOTS = [
-  { id: 'gate',   ten: 'Cổng tam quan', at: [0, 7.4, 27],        cam: [0, 10, 50],     tgt: [0, 4, 24] },
+  { id: 'gate',   ten: 'Cổng tam quan', at: [0, 7.4, 27],        cam: [0, 13, 60],     tgt: [0, 4, 24] },
   { id: 'censer', ten: 'Lư hương',      at: [0, 4.0, 4],         cam: [5, 7, 14],      tgt: [0, 2, 4] },
   { id: 'bell',   ten: 'Lầu chuông',    at: [-11, 8.2, 6],       cam: [-2.5, 8, 16.5], tgt: [-11, 3, 6] },
   { id: 'drum',   ten: 'Lầu trống',     at: [11, 8.2, 6],        cam: [2.5, 8, 16.5],  tgt: [11, 2.6, 6] },
@@ -1967,7 +2057,7 @@ function peersFromAll(){
 /* ---------------- TRÒ CHUYỆN TRONG CHÙA ----------------
    Tin nhắn lưu ở chua/<phòng>/chat/<id>: { uid, ten, loi, ts }. Mỗi người chỉ gửi hoặc gỡ tin của mình;
    tin cũ hơn 3 ngày thì ai đang mở trang cũng dọn được. */
-const chat = { ref: null, open: false, unread: 0, items: new Map(), lastSend: 0, state: 'connecting', since: 0 };
+const chat = { ref: null, open: false, unread: 0, items: new Map(), lastSend: 0, state: 'connecting', since: 0, tuBay: null };
 const chatBox = $('#chatBox'), chatList = $('#chatList'), chatToggle = $('#chatToggle'), chatBadge = $('#chatBadge'), chatNote = $('#chatNote'), chatInput = $('#chatInput');
 function chatTime(ts){ const d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
 function renderChatNote(msg){
@@ -1986,8 +2076,143 @@ function myChatName(){ return (me.profile && cleanName(me.profile.ten)) || ('Kh�
 function cleanMsg(id, v){
   if (!v || typeof v !== 'object') return null;
   const loi = cleanText(v.loi, 200); if (!loi) return null;
-  return { id, loi, ten: cleanName(v.ten) || 'Khách', ts: Number(v.ts) || 0, uid: typeof v.uid === 'string' ? v.uid : '' };
+  return { id, loi, ten: cleanName(v.ten) || 'Khách', ts: Number(v.ts) || 0, uid: typeof v.uid === 'string' ? v.uid : '', set: v.set === true };
 }
+// ---- lọc từ bậy
+function tuBayList(){
+  const src = Array.isArray(chat.tuBay) ? chat.tuBay : (CONFIG.tuBay || []);
+  return [...new Set(src.map(w => String(w).normalize('NFC').toLowerCase().trim().replace(/\s+/g, ' ')).filter(Boolean))];
+}
+const escRe = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function locBay(text){
+  let hit = false, out = String(text).normalize('NFC');
+  tuBayList().forEach(w => {
+    let re; try { re = new RegExp('(^|[^\\p{L}\\p{N}])(' + escRe(w).replace(/ /g, '\\s+') + ')(?=$|[^\\p{L}\\p{N}])', 'giu'); } catch(e){ return; }
+    out = out.replace(re, (m0, pre, word) => { hit = true; return pre + '*'.repeat([...word].length); });
+  });
+  return { hit, out };
+}
+// ---- sét đánh
+const charMat = new THREE.MeshStandardMaterial({ color: 0x1c1512, roughness: 1 });
+const UPV = new THREE.Vector3(0, 1, 0);
+function findAv(uid){
+  let av = null;
+  if (uid && uid === fbUid) av = me.av;
+  else if (uid) remote.forEach((a, peer) => { if (!av && peer.indexOf(uid + '_') === 0) av = a; });
+  return av;
+}
+function charAvatar(av, on){
+  av.grp.traverse(o => {
+    if (!o.isMesh) return;
+    if (on){ if (!o.userData.mat0) o.userData.mat0 = o.material; o.material = charMat; }
+    else if (o.userData.mat0){ o.material = o.userData.mat0; o.userData.mat0 = null; }
+  });
+}
+function makeBolt(a, b){
+  const g = new THREE.Group();
+  const core = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  const glow = new THREE.MeshBasicMaterial({ color: 0x8fb0ff, transparent: true, opacity: .4, blending: THREE.AdditiveBlending, depthWrite: false });
+  const seg = (p, q, r) => {
+    const d = q.clone().sub(p), len = d.length(), mid = p.clone().addScaledVector(d, 0.5); d.normalize();
+    [[r, core], [r*4, glow]].forEach(([rr, m]) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(rr, rr, len, 5, 1, true), m); c.position.copy(mid); c.quaternion.setFromUnitVectors(UPV, d); g.add(c); });
+  };
+  const path = (p, q, n, amp, r, branch) => {
+    let prev = p.clone();
+    for (let i=1;i<=n;i++){
+      const pt = p.clone().lerp(q, i/n);
+      if (i < n){ pt.x += rand(-amp, amp); pt.z += rand(-amp, amp); pt.y += rand(-amp, amp)*0.3; }
+      seg(prev, pt, r);
+      if (branch && i > 1 && i < n - 3 && Math.random() < 0.35) path(pt, pt.clone().add(new THREE.Vector3(rand(-3, 3), -rand(2, 4), rand(-3, 3))), 4, amp*0.6, r*0.6, false);
+      prev = pt;
+    }
+  };
+  path(a, b, 14, 0.9, 0.1, true);
+  g.userData = { core, glow }; scene.add(g); return g;
+}
+function dropBolt(bolt){ scene.remove(bolt); bolt.traverse(o => { if (o.isMesh) o.geometry.dispose(); }); bolt.userData.core.dispose(); bolt.userData.glow.dispose(); }
+function sThunder(){
+  if (!audio.on) return; const t = audio.ctx.currentTime;
+  noiseBurst(t, 3000, 0.7, 0.5, 0.25, 'highpass'); noiseBurst(t + 0.05, 220, 0.5, 0.95, 2.0, 'lowpass'); noiseBurst(t + 0.35, 90, 0.4, 0.8, 2.8, 'lowpass');
+}
+function lightningStrike(m){
+  const mine = m.uid && m.uid === fbUid;
+  toast((mine ? 'Bạn' : m.ten) + ' vừa nói bậy trong khung chat và bị sét đánh!');
+  log(m.ten + ' nói bậy trong khung chat, bị sét đánh.', 'khach');
+  const av = findAv(m.uid); if (!av) return;
+  const free = clouds.filter(c => !c.userData.strike); if (!free.length) return;
+  const p = av.grp.position; free.sort((a, b) => a.position.distanceToSquared(p) - b.position.distanceToSquared(p));
+  free[0].userData.strike = { av, t: 0, from: free[0].position.clone(), bolt: null, hit: false };
+}
+function updateClouds(dt){
+  clouds.forEach(c => {
+    const u = c.userData, s = u.strike;
+    const hx = u.cx + Math.cos(T*u.w + u.ph)*u.rx, hy = u.y + Math.sin(T*0.3 + u.ph)*0.4, hz = u.cz + Math.sin(T*u.w + u.ph)*u.rz;
+    const base = state.night ? cloudNight : cloudWhite;
+    if (!s){ tmpV.set(hx, hy, hz); c.position.lerp(tmpV, Math.min(1, dt*0.8)); u.mat.color.lerp(base, Math.min(1, dt*1.5)); return; }
+    s.t += dt;
+    const ap = s.av.grp.position;
+    if (s.t < 1.1){   // bay tới trên đầu người nói bậy, mây sẫm lại
+      tmpV.set(ap.x, ap.y + 13, ap.z); c.position.lerpVectors(s.from, tmpV, ease(s.t/1.1)); u.mat.color.lerp(cloudDark, Math.min(1, dt*3));
+    } else if (s.t < 2.1){   // giáng sét
+      c.position.x += (ap.x - c.position.x)*Math.min(1, dt*4); c.position.z += (ap.z - c.position.z)*Math.min(1, dt*4);
+      if (!s.bolt){
+        s.bolt = makeBolt(new THREE.Vector3(c.position.x, c.position.y - 1.4, c.position.z), new THREE.Vector3(ap.x, ap.y + 1.85 - 0.5*s.av.k, ap.z));
+        strikeLight.position.set(ap.x, ap.y + 3, ap.z);
+      }
+      const on = s.t < 1.85 && Math.floor((s.t - 1.1)*16) % 3 !== 2;
+      s.bolt.visible = on; strikeLight.intensity = on ? 9 : 0; if (on) flashAmt = 1;
+      if (!s.hit){ s.hit = true; sThunder(); if (s.av.zap == null || s.av.zap <= 0) charAvatar(s.av, true); s.av.zap = 3.2; s.av.puff = 0; }
+      if (s.t >= 1.85 && s.bolt.parent){ dropBolt(s.bolt); strikeLight.intensity = 0; }
+    } else if (s.t < 4){   // trở về chỗ cũ
+      tmpV.set(hx, hy, hz); c.position.lerp(tmpV, Math.min(1, dt*1.6)); u.mat.color.lerp(base, Math.min(1, dt*1.2));
+    } else { if (s.bolt && s.bolt.parent) dropBolt(s.bolt); u.strike = null; }
+  });
+  flashAmt = Math.max(0, flashAmt - dt*5);
+  hemi.intensity = (state.night ? 0.22 : 0.62) + flashAmt*0.9;
+}
+function updateZap(dt){
+  avatars.forEach(av => {
+    if (!(av.zap > 0)) return;
+    av.zap -= dt; const u = av.grp.userData, k = Math.min(1, av.zap/1.5);
+    u.body.position.x = Math.sin(T*70)*0.035*k; u.body.position.z = Math.cos(T*53)*0.025*k;
+    u.arms.forEach((a, i) => { a.rotation.x = -2.7 + Math.sin(T*40 + i)*0.15*k; a.rotation.z = (i ? 1 : -1)*0.5; });
+    av.puff -= dt; if (av.puff <= 0){ av.puff = 0.12; const p = av.grp.position; emitSmoke(p.x + rand(-.15, .15), p.y + 1.9 - 0.5*av.k, p.z + rand(-.15, .15), 1.6); }
+    if (av.zap <= 0){ charAvatar(av, false); u.body.position.x = 0; u.body.position.z = 0; }
+  });
+}
+// ---- quản lý từ cấm (mở trang với ?quantri)
+const ADMIN = /[?&]quantri(=|&|$)/.test(location.search);
+let adminApp = null;
+function getAdminApp(){
+  if (typeof firebase === 'undefined' || !firebase.auth || !FIREBASE_CONFIG.apiKey) return null;
+  if (!adminApp){
+    adminApp = firebase.apps.find(a => a.name === 'quantri') || firebase.initializeApp(FIREBASE_CONFIG, 'quantri');
+    adminApp.auth().onAuthStateChanged(u => { $('#tbAcc').textContent = u ? 'Đang đăng nhập: ' + (u.email || 'không rõ email') + '.' : 'Chỉ tài khoản Google của chủ chùa lưu được danh sách.'; $('#tbLogin').textContent = u ? 'Đổi tài khoản' : 'Đăng nhập Google'; });
+  }
+  return adminApp;
+}
+function openTuBay(){ $('#tbList').value = tuBayList().join('\n'); $('#tbErr').textContent = ''; getAdminApp(); showOverlay($('#mTuBay')); }
+if (ADMIN){
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'chat-x chat-admin'; b.textContent = 'Từ cấm'; b.onclick = openTuBay;
+  $('#chatClose').before(b);
+}
+$('#tbLogin').onclick = () => {
+  const a = getAdminApp(); if (!a){ $('#tbErr').textContent = 'Chưa tải được Firebase.'; return; }
+  a.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).then(() => { $('#tbErr').textContent = ''; })
+    .catch(e => { const code = (e && e.code) || ''; $('#tbErr').textContent = code === 'auth/operation-not-allowed' ? 'Firebase chưa bật đăng nhập Google (Authentication > Sign-in method > Google).' : code === 'auth/popup-closed-by-user' ? 'Bạn đã đóng cửa sổ đăng nhập.' : 'Không đăng nhập được (' + (code || 'lỗi') + ').'; });
+};
+$('#fTuBay').addEventListener('submit', e => {
+  e.preventDefault();
+  const a = getAdminApp(); if (!a || !a.auth().currentUser){ $('#tbErr').textContent = 'Bấm Đăng nhập Google trước khi lưu.'; return; }
+  const words = [...new Set($('#tbList').value.split('\n').map(w => w.normalize('NFC').trim().replace(/\s+/g, ' ')).filter(w => w && w.length <= 40))];
+  const text = words.join('\n');
+  if (text.length > 6000){ $('#tbErr').textContent = 'Danh sách dài quá, bớt bớt vài từ.'; return; }
+  $('#tbSave').disabled = true;
+  a.database().ref('chua/' + TEN_PHONG + '/cauHinh/tuBay').set(text)
+    .then(() => { hideOverlay($('#mTuBay')); toast('Đã lưu ' + words.length + ' từ cấm.'); })
+    .catch(() => { $('#tbErr').textContent = 'Không lưu được: tài khoản này không có quyền sửa danh sách.'; })
+    .finally(() => { $('#tbSave').disabled = false; });
+});
 function showBubble(m){
   let av = null;
   if (m.uid && m.uid === fbUid) av = me.av;
@@ -2000,15 +2225,18 @@ function showBubble(m){
 function addChatItem(m, fresh){
   if (chat.items.has(m.id)) return;
   const mine = !!m.uid && m.uid === fbUid;
-  const li = document.createElement('li'); if (mine) li.className = 'mine';
+  const lb = locBay(m.loi), bay = m.set || lb.hit; m.loi = lb.out;
+  const li = document.createElement('li'); if (mine) li.className = 'mine'; if (bay) li.classList.add('bay');
   const who = document.createElement('span'); who.className = 'who'; who.textContent = mine ? 'Bạn' : m.ten;
   const t = document.createElement('time'); t.textContent = chatTime(m.ts); who.appendChild(t);
   li.append(who, document.createTextNode(m.loi));
+  if (bay){ const tag = document.createElement('span'); tag.className = 'bay-tag'; tag.textContent = 'Nói bậy, đã bị sét đánh'; li.appendChild(tag); }
   const atBottom = chatList.scrollHeight - chatList.scrollTop - chatList.clientHeight < 40;
   chatList.appendChild(li); m.li = li; chat.items.set(m.id, m);
   if (atBottom || mine) chatList.scrollTop = chatList.scrollHeight;
   if (fresh){
     showBubble(m);
+    if (bay) lightningStrike(m);
     if (!mine){ if (!chat.open){ chat.unread++; renderBadge(); } if (audio.on) sBell(1046, .05, .12); }
   }
   renderChatNote();
@@ -2016,6 +2244,7 @@ function addChatItem(m, fresh){
 function startChat(db){
   if (!db){ chat.state = 'off'; renderChatNote(); return; }
   chat.ref = db.ref('chua/' + TEN_PHONG + '/chat'); chat.since = Date.now() + serverOffset - 5000;
+  db.ref('chua/' + TEN_PHONG + '/cauHinh/tuBay').on('value', snap => { const v = snap.val(); chat.tuBay = typeof v === 'string' ? v.split('\n').map(x => x.trim()).filter(Boolean) : null; }, () => {});
   const q = chat.ref.orderByChild('ts').limitToLast(60);
   q.on('child_added', snap => { const m = cleanMsg(snap.key, snap.val()); if (m) addChatItem(m, m.ts >= chat.since); }, () => { chat.state = 'off'; renderChatNote(); });
   q.on('child_removed', snap => { const m = chat.items.get(snap.key); if (m){ m.li.remove(); chat.items.delete(snap.key); renderChatNote(); } });
@@ -2035,7 +2264,9 @@ $('#chatForm').addEventListener('submit', e => {
   const now = Date.now();
   if (now - chat.lastSend < 1500){ renderChatNote('Gửi chậm lại một chút nhé.'); return; }
   chat.lastSend = now; chatInput.value = '';
-  chat.ref.push().set({ uid: fbUid, ten: myChatName(), loi, ts: firebase.database.ServerValue.TIMESTAMP })
+  const lb = locBay(loi), msg = { uid: fbUid, ten: myChatName(), loi: lb.out, ts: firebase.database.ServerValue.TIMESTAMP };
+  if (lb.hit) msg.set = true;
+  chat.ref.push().set(msg)
     .then(() => renderChatNote())
     .catch(() => { chatInput.value = loi; renderChatNote('Chưa gửi được tin nhắn. Kiểm tra mạng rồi thử lại.'); });
 });
@@ -2260,6 +2491,7 @@ function applyNight(){
   smokes.forEach(s => s.material.color.setHex(n ? 0xa8a0a8 : 0xe2d8c8));
   hvSmokes.forEach(s => s.material.color.setHex(n ? 0x7e767c : 0xa8a098));
   waterMat.color.set(n ? '#10282c' : C.nuoc);
+  riverMat.color.set(n ? '#14303a' : '#2f5f66');
   $('#nd-ngay').className = n ? 'dim' : 'act'; $('#nd-dem').className = n ? 'act' : 'dim';
 }
 $('#btnNgayDem').onclick = () => { state.night = !state.night; applyNight(); };
@@ -2372,6 +2604,10 @@ function animate(){
   });
   embGeo.attributes.position.needsUpdate = true;
 
+  // mây trôi, sét đánh, sông chảy
+  updateClouds(dt);
+  riverTex.offset.x -= dt*0.03;
+
   // chuông, trống, ống xăm
   if (bellSwing > 0.001){ bell.rotation.z = Math.sin(T*5.2)*0.16*bellSwing; bellSwing *= Math.pow(0.55, dt); } else bell.rotation.z = 0;
   if (strikerSwing > 0.001){ striker.position.x = 1.3 + Math.sin((1 - strikerSwing)*Math.PI*3)*0.22*strikerSwing - 0.12*strikerSwing; strikerSwing = Math.max(0, strikerSwing - dt*1.1); }
@@ -2424,6 +2660,7 @@ function animate(){
     if (chant.t >= chant.dur) nextCau();
   }
   avatars.forEach(av => updateAvatar(av, dt));
+  updateZap(dt);
   updateMonk(dt);
 
   updateLabels();
