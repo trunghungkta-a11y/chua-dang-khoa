@@ -564,6 +564,7 @@ const CONFIG = {
     quan_am:  { ten: "Quán Thế Âm Bồ Tát", mo: "Vị Bồ Tát của lòng từ bi, tượng thường mặc áo trắng và cầm bình nước cam lộ." },
     dia_tang: { ten: "Địa Tạng Vương Bồ Tát", mo: "Vị Bồ Tát với hạnh nguyện cứu độ chúng sinh, tượng thường cầm tích trượng và viên ngọc." },
     quan_am_ngoai: { ten: "Tượng Quán Thế Âm ngoài trời", mo: "Tượng đá trắng đứng trên đài sen cạnh lều xem bói, hướng mặt về hồ sen, tay cầm bình nước cam lộ." },
+    hoa_vang: { ten: "Lầu hóa vàng", mo: "Lò xây gạch hai tầng mái, có ống khói trên đỉnh, dùng để hóa vàng mã và sớ sau khi lễ xong. Theo lệ, đồ lễ bằng giấy được đốt trong lò này chứ không đốt giữa sân." },
     non_bo: { ten: "Hòn non bộ", mo: "Núi đá giữa hồ sen, có cây tùng nhỏ, ngôi tháp ba tầng và dòng thác chảy xuống mặt nước. Cá chép bơi vòng quanh chân núi." },
     la_han:   { ten: "108 vị La Hán", mo: "Các bậc đệ tử của Đức Phật đã chứng quả A La Hán. Hai dãy hành lang hai bên sân có 108 vị, mỗi bên 54 vị." },
     su:       { ten: "Sư trụ trì", mo: "Sư trụ trì của chùa. Chọn Tụng kinh, Sư sẽ vào chính điện dẫn tụng." }
@@ -1282,6 +1283,90 @@ function emitSmoke(x, y, z, strength){
   sp.userData = { life: 0, max: rand(3.2, 4.6), vy: rand(.45, .7), ph: rand(0, 6), str: strength || 1 };
   sp.scale.setScalar(0.18);
 }
+/* ===== LẦU HÓA VÀNG ===== */
+const HV = { x: -8.5, z: -11 };
+HV.ry = Math.atan2(2 - HV.x, -4 - HV.z);   // miệng lò quay về phía sân
+const hoaVang = new THREE.Group(); hoaVang.position.set(HV.x, 0, HV.z); hoaVang.rotation.y = HV.ry;
+const hvFire = [], hvVents = [];
+const fireMat = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false });
+const noSh = m => { m.userData.noShadow = true; return m; };
+let hvLight;
+(function(){
+  const g = hoaVang, brick = M(C.gach, { roughness: .9 }), trim = M(C.tuong), dark = M('#140806', { roughness: 1 }), mortar = M('#c9a888', { roughness: 1 });
+  // nền và bậc
+  g.add(box(3.4, 0.35, 3.4, M('#7d7060'), 0, 0.175, 0));
+  g.add(box(1.7, 0.18, 0.55, M('#8a7c68'), 0, 0.09, 1.95));
+  // thân lò gạch, có mạch vữa
+  g.add(box(2.2, 2.4, 2.2, brick, 0, 1.55, 0));
+  for (let i=1;i<8;i++) g.add(box(2.22, 0.025, 2.22, mortar, 0, 0.36 + i*0.3, 0));
+  g.add(box(2.4, 0.16, 2.4, trim, 0, 0.43, 0));
+  g.add(box(2.45, 0.2, 2.45, trim, 0, 2.78, 0));
+  // miệng lò hình vòm
+  g.add(box(0.9, 0.95, 0.1, dark, 0, 1.0, 1.12));
+  const archTop = cyl(0.45, 0.45, 0.1, dark, 0, 1.475, 1.12, 20); archTop.rotation.x = Math.PI/2; g.add(archTop);
+  g.add(mesh(new THREE.TorusGeometry(0.51, 0.06, 6, 20, Math.PI), trim, 0, 1.475, 1.17));
+  [-0.51, 0.51].forEach(x => g.add(box(0.12, 0.95, 0.12, trim, x, 1.0, 1.17)));
+  // lửa trong miệng lò
+  const glow = noSh(mesh(new THREE.PlaneGeometry(0.86, 1.35), fireMat(0xff6a1a, 0.3), 0, 1.2, 1.18)); g.add(glow); hvFire.push({ m: glow, glow: true });
+  const flameCols = [0xff4a10, 0xff8a1a, 0xffc040];
+  for (let i=0;i<8;i++){
+    const h = rand(0.35, 0.75), geo = new THREE.ConeGeometry(rand(0.08, 0.15), h, 8); geo.translate(0, h/2, 0);
+    const f = noSh(mesh(geo, fireMat(flameCols[i % 3], 0.75), rand(-0.3, 0.3), 0.56, 1.19 + rand(-0.015, 0.015)));
+    f.userData.ph = rand(0, 6); f.userData.sp = rand(7, 12); g.add(f); hvFire.push({ m: f });
+  }
+  for (let i=0;i<7;i++) g.add(noSh(mesh(new THREE.SphereGeometry(rand(0.05, 0.09), 6, 5), fireMat(0xff5a1a, 0.9), rand(-0.33, 0.33), 0.57, 1.19)));
+  // biển chữ
+  const bd = makeBoard([{ text: 'HÓA VÀNG', size: 210 }], 1.4, 0.4); bd.position.set(0, 2.33, 1.17); g.add(bd);
+  // mái dưới
+  const r1 = makeRoof(6.2, 6.2, 1.7); r1.scale.setScalar(0.5); r1.position.set(0, 2.88, 0); g.add(r1);   // dựng to rồi thu nhỏ để đầu đao cân với mái
+  // tầng trên, bốn ô thoáng hắt ánh lửa
+  g.add(box(1.25, 1.0, 1.25, brick, 0, 3.6, 0));
+  [0, Math.PI/2, Math.PI, -Math.PI/2].forEach(a => {
+    const v = noSh(mesh(new THREE.PlaneGeometry(0.3, 0.36), fireMat(0xff7a2a, 0.5), Math.sin(a)*0.635, 3.7, Math.cos(a)*0.635));
+    v.rotation.y = a; g.add(v); hvVents.push(v);
+  });
+  g.add(box(1.4, 0.12, 1.4, trim, 0, 4.12, 0));
+  // mái trên và ống khói
+  const r2 = makeRoof(5.0, 5.0, 1.5); r2.scale.setScalar(0.4); r2.position.set(0, 4.16, 0); g.add(r2);
+  g.add(cyl(0.2, 0.25, 0.9, brick, 0, 4.95, 0, 12));
+  g.add(cyl(0.28, 0.28, 0.1, trim, 0, 5.42, 0, 12));
+  // ánh lửa hắt ra sân
+  hvLight = new THREE.PointLight(0xff7a2a, 0.9, 11, 2); hvLight.position.set(0, 1.1, 1.9); g.add(hvLight);
+  scene.add(g); clickable(g, 'hoavang');
+})();
+// khói lầu hóa vàng: dày, xám, bốc cao rồi tạt theo gió
+const hvSmokes = [];
+for (let i=0;i<(isMobile ? 60 : 120);i++){
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0xa8a098, transparent: true, opacity: 0, depthWrite: false }));
+  sp.visible = false; sp.userData = { life: 0, max: 1 }; scene.add(sp); hvSmokes.push(sp);
+}
+let hvIdx = 0, hvEmit = 0, hvMouth = 0, hvFlare = 0;
+const hvTop = new THREE.Vector3(), hvMouthV = new THREE.Vector3();
+hoaVang.updateMatrixWorld(true);
+hoaVang.localToWorld(hvTop.set(0, 5.5, 0)); hoaVang.localToWorld(hvMouthV.set(0, 1.95, 1.3));
+function emitHV(p, big){
+  const sp = hvSmokes[hvIdx = (hvIdx + 1) % hvSmokes.length];
+  sp.position.set(p.x + rand(-.1,.1), p.y, p.z + rand(-.1,.1)); sp.visible = true;
+  sp.userData = big
+    ? { life: 0, max: rand(5.5, 7.5), vy: rand(.9, 1.3), ph: rand(0, 6), s0: 0.5, s1: rand(4.2, 5.6), op: 0.72 }
+    : { life: 0, max: rand(2.4, 3.4), vy: rand(.5, .8), ph: rand(0, 6), s0: 0.3, s1: 1.8, op: 0.4 };
+  sp.scale.setScalar(sp.userData.s0); sp.material.rotation = rand(0, 6);
+}
+// tàn lửa bay lên từ ống khói và miệng lò
+const EMB = isMobile ? 24 : 48;
+const embGeo = new THREE.BufferGeometry(), embPos = new Float32Array(EMB*3);
+embGeo.setAttribute('position', new THREE.BufferAttribute(embPos, 3));
+const embers = new THREE.Points(embGeo, new THREE.PointsMaterial({ color: 0xffa040, map: smokeTex, size: 0.16, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false }));
+embers.frustumCulled = false; scene.add(embers);
+const embData = [];
+for (let i=0;i<EMB;i++) embData.push({ life: 9, max: 0, x: 0, y: -50, z: 0, vx: 0, vy: 0, vz: 0, ph: rand(0, 6) });
+function resetEmber(e){
+  const src = Math.random() < 0.65 ? hvTop : hvMouthV;
+  e.x = src.x + rand(-.15,.15); e.y = src.y; e.z = src.z + rand(-.15,.15);
+  e.vx = rand(-.25, .45); e.vy = rand(1.0, 2.0); e.vz = rand(-.3, .3); e.life = 0; e.max = rand(1.0, 2.2);
+}
+embData.forEach(e => { resetEmber(e); e.life = rand(0, e.max); });
+
 const leaves = [];
 const leafGeo = new THREE.PlaneGeometry(0.2, 0.13);
 for (let i=0;i<(isMobile ? 18 : 34);i++){
@@ -1385,6 +1470,7 @@ const SPOTS = [
   { id: 'tree',   ten: 'Cây nguyện ước',at: [13, 10.8, -2],      cam: [3.5, 7, 8.5],   tgt: [13, 5, -2] },
   { id: 'pond',   ten: 'Hồ sen',        at: [-8.45, 3.6, 18.5],  cam: [-1, 10, 11],      tgt: [-8.45, 0.6, 18.5] },
   { id: 'quanam', ten: 'Tượng Quan Âm', at: [12.6, 7.3, 17.5],   cam: [3.2, 5.6, 20.5], tgt: [12.6, 3.4, 17.5] },
+  { id: 'hoavang', ten: 'Lầu hóa vàng', at: [-8.5, 8.6, -11],    cam: [1.5, 7, -4.3],   tgt: [-8.5, 4.2, -11] },
   { id: 'boi',    ten: 'Lều xem bói',   at: [8.5, 4.0, 21.2],    cam: [4, 6, 31],      tgt: [8.5, 1.3, 21.2] },
   { id: 'lahan',  ten: 'Hành lang La Hán', at: [-15.8, 4.4, -12], cam: [-5, 4.2, 13], tgt: [-15.8, 1.3, 19.5] },
   { id: 'lahan2', ten: 'Hành lang La Hán', at: [15.8, 4.4, -12],  cam: [5, 4.2, 13], tgt: [15.8, 1.3, 19.5], hideNav: true }
@@ -2039,6 +2125,7 @@ function applyNight(){
   yardLight.intensity = n ? 1.1 : 0; altarLight.intensity = n ? 1.6 : 1.0;
   lanternMat.emissiveIntensity = n ? 1.6 : 0.25; stars.visible = n;
   smokes.forEach(s => s.material.color.setHex(n ? 0xa8a0a8 : 0xe2d8c8));
+  hvSmokes.forEach(s => s.material.color.setHex(n ? 0x7e767c : 0xa8a098));
   waterMat.color.set(n ? '#10282c' : C.nuoc);
   $('#nd-ngay').className = n ? 'dim' : 'act'; $('#nd-dem').className = n ? 'act' : 'dim';
 }
@@ -2079,6 +2166,7 @@ renderer.domElement.addEventListener('pointerup', e => {
   else if (a === 'tuong') showInfo(o.userData.data);
   else if (a === 'su') showInfo('su');
   else if (a === 'boi') openBoi();
+  else if (a === 'hoavang'){ hvFlare = 1; showInfo('hoa_vang'); }
   else if (a === 'lahan'){ const id = r.h.instanceId; if (id != null) showInfo('la_han', 'Đây là vị thứ ' + (id % 54 + 1) + ' ở hành lang ' + (id < 54 ? 'bên trái' : 'bên phải') + ' (nhìn từ cổng vào).'); else showInfo('la_han'); }
 });
 let hoverT = 0;
@@ -2125,6 +2213,31 @@ function animate(){
     sp.scale.setScalar(0.18 + p*1.5);
     sp.material.opacity = (p < 0.15 ? p/0.15 : 1 - (p - 0.15)/0.85) * 0.32 * u.str;
   });
+
+  // lầu hóa vàng: lửa, khói, tàn lửa
+  hvFlare = Math.max(0, hvFlare - dt/5);
+  const fl = 1 + hvFlare*0.8;
+  hvFire.forEach(({ m, glow }) => {
+    if (glow){ m.material.opacity = (0.28 + Math.sin(T*13)*0.05 + Math.sin(T*7.3)*0.04) * fl; return; }
+    const u = m.userData; m.scale.set(1, (0.75 + Math.sin(T*u.sp + u.ph)*0.25 + Math.sin(T*u.sp*1.7 + u.ph)*0.1) * fl, 1); m.rotation.y += dt*2;
+  });
+  hvVents.forEach((v, i) => { v.material.opacity = (0.42 + Math.sin(T*9 + i*1.7)*0.14) * fl; });
+  hvLight.intensity = (state.night ? 2.2 : 0.9) * (0.85 + Math.sin(T*17)*0.08 + Math.sin(T*6.1)*0.07) * fl;
+  hvEmit -= dt; if (hvEmit <= 0){ hvEmit = (isMobile ? 0.14 : 0.075) / fl; emitHV(hvTop, true); }
+  hvMouth -= dt; if (hvMouth <= 0){ hvMouth = (isMobile ? 0.6 : 0.35) / fl; emitHV(hvMouthV, false); }
+  hvSmokes.forEach(sp => {
+    if (!sp.visible) return; const u = sp.userData; u.life += dt; const p = u.life/u.max;
+    if (p >= 1){ sp.visible = false; sp.material.opacity = 0; return; }
+    sp.position.y += u.vy*(1 - p*0.5)*dt; sp.position.x += (0.35 + Math.sin(T*0.6 + u.ph)*0.25)*p*dt; sp.position.z += Math.cos(T*0.5 + u.ph)*0.15*dt;
+    sp.scale.setScalar(u.s0 + p*(u.s1 - u.s0)); sp.material.rotation += dt*0.15;
+    sp.material.opacity = (p < 0.1 ? p/0.1 : 1 - (p - 0.1)/0.9) * u.op;
+  });
+  embData.forEach((e, i) => {
+    e.life += dt; if (e.life >= e.max) resetEmber(e);
+    e.vy -= dt*0.35; e.x += (e.vx + Math.sin(T*3 + e.ph)*0.3)*dt; e.y += e.vy*dt; e.z += e.vz*dt;
+    embPos[i*3] = e.x; embPos[i*3+1] = e.y; embPos[i*3+2] = e.z;
+  });
+  embGeo.attributes.position.needsUpdate = true;
 
   // chuông, trống, ống xăm
   if (bellSwing > 0.001){ bell.rotation.z = Math.sin(T*5.2)*0.16*bellSwing; bellSwing *= Math.pow(0.55, dt); } else bell.rotation.z = 0;
